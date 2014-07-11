@@ -255,6 +255,13 @@
 							$va_element_errors[$vs_element_name] = _t("'%1' is not valid for %2", $vs_value, $va_element_info['description']);
 						}
 						break;
+                    case 'LIST_DATABASE':
+                        if ($vs_value) {
+                            if (!preg_match("/^[A-Za-z0-9]+$/", $vs_value)) {
+                                $va_element_errors[$vs_element_name] = _t("'%1' is not valid for %2; only letters and numbers are allowed", $vs_value, $va_element_info['description']);
+                            }
+                        }
+                        break;
 					case 'SERIAL':
 						if ($vs_value) {
 							if (!preg_match("/^[A-Za-z0-9]+$/", $vs_value)) { 
@@ -353,6 +360,16 @@
 							}
 						}
 						break;
+                    case 'DDC':
+                        if (!preg_match("/^\d{1,3}\.\d{0,4}$/", $vs_value)) {
+                            $va_element_errors[$vs_element_name] = _t("%1 must be a valid Dewey Decimal Number", $va_element_info['description']);
+                        }
+                        break;
+                    case 'LCC':
+                        if (!preg_match("/^^[A-Z]{1,3}\ \d{1,4}\ ([A-Z]\d{1,4}\ )+\d{4}(\ .*)?$/", $vs_value)) {
+                            $va_element_errors[$vs_element_name] = _t("%1 must be a valid LCC formatted number", $va_element_info['description']);
+                        }
+                        break;
 					default:
 						# noop
 						break;
@@ -969,6 +986,32 @@
 					}
 					
 					break;
+                # ----------------------------------------------------
+                case 'LIST_DATABASE':
+                    $vs_value_list = $this->getValuesFromDatabase($ps_element_name, null);
+
+                    if (empty($vs_value_list)) {
+                        $vs_element = '&lt;You must first create a ' . $va_element_info['description'] . ' object&gt;';
+                    }
+                    else {
+                        $DISABLED = ($vs_element_value && !$va_element_info['editable']) ? 'disabled="disabled"' : '';
+
+                        $vs_element = '<select name="' . $vs_element_form_name . '" id="' . $ps_id_prefix . $vs_element_form_name . '" ' . $DISABLED . '>';
+                        $vs_id_field = $va_element_info['id_field'];
+                        $vs_name_field = $va_element_info['name_field'];
+
+                        foreach ($vs_value_list as $vs_value) {
+                            $SELECTED = ($vs_value[$vs_id_field] == $vs_element_value) ? 'selected="1"' : '';
+
+                            $vs_element .= '<option ' . $SELECTED . ' value="' . $vs_value[$vs_id_field] . '">' .
+                                $vs_value[$vs_name_field] . ' (' . $vs_value[$vs_id_field] . ')' .
+                                '</option>';
+                        }
+
+                        $vs_element .= '</select>';
+                    }
+
+                    break;
 				# ----------------------------------------------------
 				case 'SERIAL':
 					$vn_width = $this->getElementWidth($va_element_info, 3);
@@ -1003,6 +1046,8 @@
 				case 'FREE':
 				case 'NUMERIC':
 				case 'ALPHANUMERIC':
+                case 'LCC':
+                case 'DCC':
 					if (!$vs_element_value && !$pb_generate_for_search_form) { $vs_element_value = $va_element_info['default']; }
 					$vn_width = $this->getElementWidth($va_element_info, 3);
 					if (!$vs_element_value || $va_element_info['editable'] || $pb_generate_for_search_form) {
