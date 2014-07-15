@@ -132,10 +132,10 @@
 			}
 			
 			if (!$this->isValidFormat($ps_format)) { 
-				return false;	// specifed format does not exist
+				return false;	// specified format does not exist
 			}
 			if (!$this->isValidType($ps_type)) { 
-				return false;	// specifed type does not exist
+				return false;	// specified type does not exist
 			}
 			
 			$va_base_elements = $this->opa_formats[$ps_format][$ps_type]['elements'];
