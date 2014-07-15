@@ -723,8 +723,51 @@
 			
 			return array_unique($va_output_values);
 		}
+        # -------------------------------------------------------
+        /**
+         * Returns a list of available lots from the database.
+         *
+         * @param $ps_element_name
+         * @param null $ps_value
+         * @return array|string
+         */
+        public function getValuesFromDatabase($ps_element_name, $ps_value=null) {
+            if (!$ps_value) {$ps_value = $this->getValue();}
+            $va_element_info = $this->getElementInfo($ps_element_name);
+
+            $vs_table = $va_element_info['label_table'];
+            $vs_id_field = $va_element_info['id_field'];
+            $vs_name_field = $va_element_info['name_field'];
+            $vs_sort_field = $va_element_info['sort_field'];
+
+            if (!$vs_table) { return 'ERR'; }
+            if (!$vs_id_field) { return 'ERR'; }
+            if (!$vs_name_field) { return 'ERR'; }
+            if (!$vs_sort_field) { $vs_sort_field = $vs_name_field; }
+
+            // return a list of lots
+            $results_array = array();
+            if ($qr_res = $this->opo_db->query(
+                    "SELECT $vs_id_field, $vs_name_field FROM $vs_table WHERE type_id IS NULL ORDER BY $vs_sort_field")) {
+
+                if ($this->opo_db->numErrors()) {
+                    return 'ERR';
+                }
+
+                if ($qr_res->numRows()) {
+                    while ($qr_res->nextRow()) {
+                        $results_array[] =
+                            array($vs_id_field=>$qr_res->get($vs_id_field),
+                                  $vs_name_field=>$qr_res->get($vs_name_field));
+                    }
+                }
+            }
+
+            return $results_array;
+        }
+
 		# -------------------------------------------------------
-		# User interace (HTML)
+		# User interface (HTML)
 		# -------------------------------------------------------
 		public function htmlFormElement($ps_name, &$pa_errors=null, $pa_options=null) {
 			if (!is_array($pa_options)) { $pa_options = array(); }
@@ -994,7 +1037,7 @@
                         $vs_element = '&lt;You must first create a ' . $va_element_info['description'] . ' object&gt;';
                     }
                     else {
-                        $DISABLED = ($vs_element_value && !$va_element_info['editable']) ? 'disabled="disabled"' : '';
+                        $DISABLED = (isset($vs_element_value) && !$va_element_info['editable']) ? 'disabled="disabled"' : '';
 
                         $vs_element = '<select name="' . $vs_element_form_name . '" id="' . $ps_id_prefix . $vs_element_form_name . '" ' . $DISABLED . '>';
                         $vs_id_field = $va_element_info['id_field'];
