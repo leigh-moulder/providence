@@ -161,6 +161,9 @@
 							if ($va_base_element['values'][$vn_j] != $va_ext_element['values'][$vn_j]) { return false; }
 						}
 						break;
+                    case 'LIST_DATABASE':
+                        return false;
+                        break;
 					case 'CONSTANT';
 						if ($va_base_element['value'] != $va_ext_element['value']) { return false; }
 						break;
@@ -636,6 +639,7 @@
 				
 				switch($va_element_info['type']) {
 					case 'LIST':
+                    case 'LIST_DATABASE':
 						$va_output[$vn_i] = array($va_element_vals[$vn_i]);
 						break;
 					case 'CONSTANT':
@@ -1037,21 +1041,26 @@
                         $vs_element = '&lt;You must first create a ' . $va_element_info['description'] . ' object&gt;';
                     }
                     else {
-                        $DISABLED = (isset($vs_element_value) && !$va_element_info['editable']) ? 'disabled="disabled"' : '';
+                        $disabled = isset($vs_element_value) && !$va_element_info['editable'];
 
-                        $vs_element = '<select name="' . $vs_element_form_name . '" id="' . $ps_id_prefix . $vs_element_form_name . '" ' . $DISABLED . '>';
-                        $vs_id_field = $va_element_info['id_field'];
-                        $vs_name_field = $va_element_info['name_field'];
+                        if (!$disabled) {
+                            $vs_element = '<select name="' . $vs_element_form_name . '" id="' . $ps_id_prefix . $vs_element_form_name . '" >';
+                            $vs_id_field = $va_element_info['id_field'];
+                            $vs_name_field = $va_element_info['name_field'];
 
-                        foreach ($vs_value_list as $vs_value) {
-                            $SELECTED = ($vs_value[$vs_id_field] == $vs_element_value) ? 'selected="1"' : '';
+                            foreach ($vs_value_list as $vs_value) {
+                                $SELECTED = ($vs_value[$vs_id_field] == $vs_element_value) ? 'selected="1"' : '';
 
-                            $vs_element .= '<option ' . $SELECTED . ' value="' . $vs_value[$vs_id_field] . '">' .
-                                $vs_value[$vs_name_field] . ' (' . $vs_value[$vs_id_field] . ')' .
-                                '</option>';
+                                $vs_element .= '<option ' . $SELECTED . ' value="' . $vs_value[$vs_id_field] . '">' .
+                                    $vs_value[$vs_name_field] . ' (' . $vs_value[$vs_id_field] . ')' .
+                                    '</option>';
+                            }
+
+                            $vs_element .= '</select>';
                         }
-
-                        $vs_element .= '</select>';
+                        else {
+                            $vs_element = '<input type="hidden" name="' . $vs_element_form_name . '" id="' . $ps_id_prefix . $vs_element_form_name . '" value="' . $vs_element_value . '"/>' . $vs_element_value;
+                        }
                     }
 
                     break;
