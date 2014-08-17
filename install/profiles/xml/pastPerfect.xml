@@ -1879,7 +1879,7 @@
                         </label>
                     </labels>
                 </item>
-                <item idno="yes" enabled="1" default="0" value="1">
+                <item idno="public access" enabled="1" default="0" value="1">
                     <labels>
                         <label locale="en_US" preferred="1">
                             <name_singular>Accessible to public</name_singular>
