@@ -1879,7 +1879,7 @@
                         </label>
                     </labels>
                 </item>
-                <item idno="public access" enabled="1" default="0" value="1">
+                <item idno="public_access" enabled="1" default="0" value="1">
                     <labels>
                         <label locale="en_US" preferred="1">
                             <name_singular>Accessible to public</name_singular>
@@ -4135,6 +4135,18 @@
                         </placement>
                         <placement code="ca_attribute_description">
                             <bundle>ca_attribute_description</bundle>
+                        </placement>
+                    </bundlePlacements>
+                </screen>
+                <screen idno="media" default="0">
+                    <labels>
+                        <label locale="en_US">
+                            <name>Media</name>
+                        </label>
+                    </labels>
+                    <bundlePlacements>
+                        <placement code="ca_object_representations">
+                            <bundle>ca_object_representations</bundle>
                         </placement>
                     </bundlePlacements>
                 </screen>
