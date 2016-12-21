@@ -472,7 +472,7 @@ class RequestHTTP extends Request {
 			# -----------------------------------------
 		}
 		
-		die("Invalid parameter type for $ps_name\n");
+		die("Invalid parameter type for ($pn_type) for $ps_name, and has a value of: $vm_val\n");
 	}
 	# -------------------------------------------------------
 	/**

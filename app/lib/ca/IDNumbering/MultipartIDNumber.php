@@ -369,7 +369,7 @@
                         }
                         break;
                     case 'LCC':
-                        if (!preg_match("/^^[A-Z]{1,3}\ \d{1,4}\ ([A-Z]\d{1,4}\ )+\d{4}(\ .*)?$/", $vs_value)) {
+                        if (!preg_match("/^[A-Z]{1,3}\ \d{1,4}\ ([A-Z]\d{1,4}\ )+\d{4}(\ .*)?$/", $vs_value)) {
                             $va_element_errors[$vs_element_name] = _t("%1 must be a valid LCC formatted number", $va_element_info['description']);
                         }
                         break;
@@ -651,7 +651,6 @@
 						if ((int)$va_element_vals[$vn_i] > 0) {
 							$va_output[$vn_i][] = (int)$va_element_vals[$vn_i];
 						}
-						
 						break;
 					case 'SERIAL':
 					case 'NUMERIC':

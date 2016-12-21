@@ -1,6 +1,8 @@
 Order allow,deny
 Allow from all
 
+DirectoryIndex index.php
+
 <FilesMatch ".*\.[A-Za-z0-9]+">
 	Deny from all
 </FilesMatch>
