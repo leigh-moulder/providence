@@ -7,7 +7,7 @@
  * ----------------------------------------------------------------------
  *
  * Software by Whirl-i-Gig (http://www.whirl-i-gig.com)
- * Copyright 2011 Whirl-i-Gig
+ * Copyright 2011-2013 Whirl-i-Gig
  *
  * For more information visit http://www.CollectiveAccess.org
  *
@@ -52,7 +52,7 @@ require_once(__CA_MODELS_DIR__.'/ca_lists.php');
 	 */
 	function caGetLabelForDisplay(&$pa_facet, $pa_item, $pa_facet_info, $pa_options=null) {
 		$vs_term_class = (isset($pa_options['termClass']) && $pa_options['termClass']) ? $pa_options['termClass'] : 'hierarchyBrowserItemTerm';
-		$vs_label = "<span class='{$vs_term_class}'>".htmlentities($pa_item['label'], ENT_COMPAT, 'UTF-8')."</span>";
+		$vs_label = "<span class='{$vs_term_class}'>".htmlentities(isset($pa_item['display_label']) ? $pa_item['display_label'] : $pa_item['label'], ENT_COMPAT, 'UTF-8')."</span>";
 		if ($pa_facet_info['show_hierarchy'] && $pa_item['parent_id']) {
 			$va_hierarchy = caGetHierarchicalLabelsForDisplay($pa_facet, $pa_item['parent_id'], $pa_options);
 			array_unshift($va_hierarchy, $vs_label);

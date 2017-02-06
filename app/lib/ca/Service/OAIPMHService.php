@@ -338,12 +338,32 @@ class OAIPMHService extends BaseService {
 			$this->throwError(self::OAI_ERR_ID_DOES_NOT_EXIST, _t('Identifier is invalid'));
 			return;
 		}
+
+		$va_access_values = caGetUserAccessValues($this->opo_request, array_merge($this->opa_provider_info, array('ignoreProvidence' => true)));
+		$vb_show_deleted = (bool)$this->opa_provider_info['show_deleted'];
+		$vb_dont_enforce_access_settings = (bool)$this->opa_provider_info['dont_enforce_access_settings'];
+
+		if(!$vb_dont_enforce_access_settings && $t_item->hasField('access')) {
+			if(!in_array($t_item->get('access'), $va_access_values)) {
+				$this->throwError(self::OAI_ERR_ID_DOES_NOT_EXIST, _t('Identifier is invalid'));
+				return;
+			}
+		}
+
+		if($t_item->hasField('deleted')) {
+			if(!$vb_show_deleted && ((bool) $t_item->get('deleted'))) {
+				$this->throwError(self::OAI_ERR_ID_DOES_NOT_EXIST, _t('Identifier is deleted'));
+				return;
+			}
+		}
+
+		$va_last_change = $t_item->getLastChangeTimestamp();
 	
 		$vs_export = ca_data_exporters::exportRecord($this->getMappingCode(),$t_item->getPrimaryKey());
 	
 		$headerData = array(
-			'identifier' => OaiIdentifier::itemToOaiId($ps_identifier),
-			'datestamp' => self::unixToUtc(time()),
+			'identifier' => OaiIdentifier::itemToOaiId($vs_item_id),
+			'datestamp' => self::unixToUtc((int) $va_last_change['timestamp']),
 		);
 
 		$exportFragment = $oaiData->createDocumentFragment();
@@ -365,9 +385,7 @@ class OAIPMHService extends BaseService {
 		$va_access_values = caGetUserAccessValues($this->opo_request, $this->opa_provider_info);
 		$vb_show_deleted = (bool)$this->opa_provider_info['show_deleted'];
 		$vb_dont_enforce_access_settings = (bool)$this->opa_provider_info['dont_enforce_access_settings'];
-
-		$listSets = $oaiData->createElement('ListSets');     
-		$oaiData->documentElement->appendChild($listSets);
+		$vb_dont_cache = (bool)$this->opa_provider_info['dont_cache'];
 	
 		if ($vs_facet_name = $this->opa_provider_info['setFacet']) {
 			$o_browse = caGetBrowseInstance($this->table);
@@ -375,16 +393,24 @@ class OAIPMHService extends BaseService {
 			if (($vs_query = $this->opa_provider_info['query']) && ($vs_query != "*")) {
 				$o_browse->addCriteria("_search", $vs_query);
 			}
-			$o_browse->execute();
+			$o_browse->execute(array('no_cache' => $vb_dont_cache, 'showDeleted' => $vb_show_deleted, 'checkAccess' => $vb_dont_enforce_access_settings ? null : $va_access_values));
 			$va_facet = $o_browse->getFacet($vs_facet_name,array('checkAccess' => ($vb_dont_enforce_access_settings ? null : $va_access_values)));
 	
-			foreach($va_facet as $vn_id => $va_info) {
-				$elements = array( 
-					'setSpec' => $va_info['id'],
-					'setName' => caEscapeForXml($va_info['label'])
-				);
-				$this->createElementWithChildren($this->oaiData, $listSets, 'set', $elements);
+			 if (is_array($va_facet)) {
+				$listSets = $oaiData->createElement('ListSets');
+				$oaiData->documentElement->appendChild($listSets);
+				foreach($va_facet as $vn_id => $va_info) {
+						$elements = array(
+								'setSpec' => $va_info['id'],
+								'setName' => caEscapeForXml($va_info['label'])
+						);
+						$this->createElementWithChildren($this->oaiData, $listSets, 'set', $elements);
+				}
+			} else {
+				$this->throwError(self::OAI_ERR_NO_SET_HIERARCHY, _t('No sets are available'));
 			}
+		} else {
+			$this->throwError(self::OAI_ERR_NO_SET_HIERARCHY, _t('Sets are not supported'));
 		}
 	}
 	# -------------------------------------------------------
@@ -399,6 +425,7 @@ class OAIPMHService extends BaseService {
 	private function initListResponse($oaiData) {
 		$from = $this->opo_request->getParameter('from', pString);
 		$until = $this->opo_request->getParameter('until', pString);
+		$fromDate = $untilDate = null;
 	
 		if ($from) { $fromDate = self::utcToDb($from); }
 		if ($until) { $untilDate = self::utcToDb($until); }
@@ -422,9 +449,7 @@ class OAIPMHService extends BaseService {
 	 * @uses listResponse()
 	 */
 	private function resumeListResponse($oaiData, $token) {
-		$o_cache = caGetCacheObject('ca_oai_provider_'.$this->ops_provider);
-	
-		$va_token_info = $o_cache->load($token);
+		$va_token_info = ExternalCache::fetch($token, 'OAIPMHService');
 	
 		if(!$va_token_info || ($va_token_info['verb'] != $this->opo_request->getParameter('verb', pString))) {
 			$this->throwError(self::OAI_ERR_BAD_RESUMPTION_TOKEN);
@@ -484,7 +509,7 @@ class OAIPMHService extends BaseService {
 			$o_browse->execute(array('showDeleted' => $vb_show_deleted, 'no_cache' => $vb_dont_cache, 'limitToModifiedOn' => $vs_range, 'checkAccess' => $vb_dont_enforce_access_settings ? null : $va_access_values));
 			$qr_res = $o_browse->getResults();
 		} else {
-			$qr_res = $o_search->search(strlen($this->opa_provider_info['query']) ? $this->opa_provider_info['query'] : "*", array('no_cache' => $vb_dont_cache, 'limitToModifiedOn' => $vs_range, 'showDeleted' => $vb_show_deleted, 'checkAccess' => $vb_show_deleted ? null : $va_access_values));
+			$qr_res = $o_search->search(strlen($this->opa_provider_info['query']) ? $this->opa_provider_info['query'] : "*", array('no_cache' => $vb_dont_cache, 'limitToModifiedOn' => $vs_range, 'showDeleted' => $vb_show_deleted, 'checkAccess' => $vb_dont_enforce_access_settings ? null : $va_access_values));
 		}
 
 		if (!$qr_res) {
@@ -528,7 +553,7 @@ class OAIPMHService extends BaseService {
 			}
 		
 			// Export data using metadata mapping
-			$va_items = ca_data_exporters::exportRecordsFromSearchResultToArray($this->getMappingCode(),$qr_res,array('start' => $cursor, 'limit' => $listLimit));
+			$va_items = ca_data_exporters::exportRecordsFromSearchResultToArray($this->getMappingCode($metadataPrefix), $qr_res, array('start' => $cursor, 'limit' => $listLimit));
 			if (is_array($va_items) && sizeof($va_items)) {
 				$va_timestamps = $t_change_log->getLastChangeTimestampsForIDs($vs_table, array_keys($va_items));
 				foreach($va_items as $vn_id => $vs_item_xml) {
@@ -603,8 +628,7 @@ class OAIPMHService extends BaseService {
 	 * @return array resumption token info
 	 */
 	private function createResumptionToken($verb, $metadataPrefix, $cursor, $set, $from, $until) {
-	
-		$o_cache = caGetCacheObject('ca_oai_provider_'.$this->ops_provider);
+
 		$va_token_info = array(
 			'verb' => $verb,
 			'metadata_prefix' => $metadataPrefix,
@@ -616,8 +640,8 @@ class OAIPMHService extends BaseService {
 		);
 		$vs_key = md5(print_r($va_token_info, true).'/'.time().'/'.rand(0, 1000000));
 		$va_token_info['key'] = $vs_key;
-	
-		$o_cache->save($va_token_info, $vs_key);
+
+		ExternalCache::save($vs_key, $va_token_info, 'OAIPMHService');
 	
 		return $va_token_info;
 	}
@@ -685,7 +709,7 @@ class OAIPMHService extends BaseService {
 	 * @return DomElement The new element.
 	 */
 	protected function appendNewElement($parent, $name, $text = null) {
-		$document = $oaiData;
+		$document = $this->oaiData;
 		$newElement = $document->createElement($name);
 		// Use a TextNode, causes escaping of input text
 		if($text) {
@@ -709,7 +733,7 @@ class OAIPMHService extends BaseService {
 			$this->throwError(self::OAI_ERR_BAD_ARGUMENT, _t("Duplicate parameters in request"));
 		}
 	
-		if((!($vs_metadata_prefix = $this->opo_request->getParameter('metadataPrefix', pString))) && ((in_array('metadataPrefix', $pa_required_parameters)) || (in_array('metadataPrefix', $pa_optional_parameters))) && $this->opa_provider_info['default_format']) {
+		if((!($vs_metadata_prefix = $this->opo_request->getParameter('metadataPrefix', pString))) && ((in_array('metadataPrefix', $pa_required_parameters)) || (in_array('metadataPrefix', $pa_optional_parameters))) && isset($this->opa_provider_info['default_format'])) {
 			$_REQUEST['metadataPrefix'] = $vs_metadata_prefix = $this->opa_provider_info['default_format'];
 			$this->opo_request->setParameter('metadataPrefix', $vs_metadata_prefix, 'REQUEST');
 		}
@@ -748,13 +772,19 @@ class OAIPMHService extends BaseService {
 			}
 		}
 
-		$this->exporter = ca_data_exporters::loadExporterByCode($this->getMappingCode());
+		if($vs_mapping = $this->getMappingCode()){
+			if($this->exporter = ca_data_exporters::loadExporterByCode($vs_mapping)){
+				if($this->exporter->getSetting('exporter_format') != "XML"){
+					$this->throwError(self::OAI_ERR_BAD_ARGUMENT, _t("Selected mapping %1 is invalid", $vs_mapping));
+				}
 
-		if($this->exporter->getSetting('exporter_format') != "XML"){
-			$this->throwError(self::OAI_ERR_BAD_ARGUMENT, _t("Selected mapping %1 is invalid",$this->getMappingCode()));
+				$this->table = $this->exporter->getAppDatamodel()->getTableName($this->exporter->get('table_num'));
+			} else {
+				$this->throwError(self::OAI_ERR_CANNOT_DISSEMINATE_FORMAT, _t("Exporter with code %1 does not exist", $vs_mapping));
+			}
+		} else {
+			$this->throwError(self::OAI_ERR_CANNOT_DISSEMINATE_FORMAT, _t("metadataPrefix or default_format is invalid", $vs_mapping));
 		}
-
-		$this->table = $this->exporter->getAppDatamodel()->getTableName($this->exporter->get('table_num'));
 
 		return !$this->error;
 	}
@@ -821,10 +851,15 @@ class OAIPMHService extends BaseService {
 	}
 	# -------------------------------------------------------
 	/**
-	 * Responds to GetRecord OAI verb
+	 * Get mapping code for metadata prefix
+	 *
+	 * @param string|null optional metadata prefix
+	 * @return string|bool;
 	 */
-	public function getMappingCode() {
-		$ps_metadata_prefix = $this->opo_request->getParameter('metadata_prefix', pString);
+	public function getMappingCode($ps_metadata_prefix = null) {
+		if(!$ps_metadata_prefix) {
+			$ps_metadata_prefix = $this->opo_request->getParameter('metadataPrefix', pString);
+		}
 
 		if(!$ps_metadata_prefix && isset($this->opa_provider_info['default_format'])) {
 			$ps_metadata_prefix = $this->opa_provider_info['default_format'];

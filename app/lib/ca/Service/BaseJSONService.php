@@ -38,6 +38,9 @@ require_once(__CA_MODELS_DIR__."/ca_lists.php");
 
 class BaseJSONService {
 	# -------------------------------------------------------
+	/**
+	 * @var RequestHTTP
+	 */
 	protected $opo_request;
 	protected $ops_table;
 	protected $opo_dm;
@@ -48,7 +51,7 @@ class BaseJSONService {
 	protected $opa_post;
 	protected $ops_method;
 
-	protected $opa_valid_tables;
+	protected $opa_valid_tables = array();
 	# -------------------------------------------------------
 	public function __construct($po_request,$ps_table=""){
 		$this->opo_request = $po_request;
@@ -58,11 +61,21 @@ class BaseJSONService {
 		
 		$this->ops_method = $this->opo_request->getRequestMethod();
 		
-		if(!in_array($this->ops_method, array("PUT","DELETE","GET","OPTIONS"))){
+		if(!in_array($this->ops_method, array("PUT","DELETE","GET","POST","OPTIONS"))){
 			$this->addError(("Invalid HTTP request method"));
 		}
 		
 		$this->opn_id = $this->opo_request->getParameter("id",pString);	// we allow for a string to support fetching by idno; typically it's a numeric id
+		if($vs_locale = $this->opo_request->getParameter('lang', pString)) {
+			global $g_ui_locale, $g_ui_locale_id, $_;
+			$g_ui_locale = $vs_locale;
+			$t_locale = new ca_locales();
+			if($g_ui_locale_id = $t_locale->localeCodeToID($vs_locale)) {
+				$g_ui_locale = $vs_locale;
+				if(!initializeLocale($g_ui_locale)) die("Error loading locale ".$g_ui_locale);
+				$this->opo_request->reloadAppConfig();
+			}
+		}
 
 		$vs_post_data = $this->opo_request->getRawPostData();
 		if(strlen(trim($vs_post_data))>0){
@@ -70,11 +83,16 @@ class BaseJSONService {
 			if(!is_array($this->opa_post)){
 				$this->addError(_t("Data sent via POST doesn't seem to be in JSON format"));
 			}
+		} else if($vs_post_data = $this->opo_request->getParameter('source', pString)) {
+			$this->opa_post = json_decode($vs_post_data, true);
+			if(!is_array($this->opa_post)){
+				$this->addError(_t("Data sent via 'source' parameter doesn't seem to be in JSON format"));
+			}
 		} else {
 			$this->opa_post = array();
-		}		
+		}
 
-		$this->opa_valid_tables = array(
+		$va_base_tables = array(
 			"ca_objects", "ca_object_lots", "ca_entities",
 			"ca_places", "ca_occurrences", "ca_collections",
 			"ca_list_items", "ca_lists", "ca_object_representations",
@@ -82,7 +100,13 @@ class BaseJSONService {
 			"ca_loans", "ca_tours", "ca_tour_stops", "ca_sets"
 		);
 
-		if(strlen($ps_table)>0){
+		if(is_array($this->opa_valid_tables)) {
+			$this->opa_valid_tables = array_merge($va_base_tables, $this->opa_valid_tables);
+		} else {
+			$this->opa_valid_tables = $va_base_tables;
+		}
+
+		if(strlen($ps_table)>0) {
 			if(!in_array($ps_table, $this->opa_valid_tables)){
 				$this->addError(_t("Table does not exist"));
 			}
@@ -122,7 +146,7 @@ class BaseJSONService {
 	 * Get BaseModel instance for given table and optionally load the record with the specified ID
 	 * @param string $ps_table table name, e.g. "ca_objects"
 	 * @param mixed $pn_id integer primary key value of the record to load, or string idno value for the record to load 
-	 * @return BaseModel
+	 * @return BundlableLabelableBaseModelWithAttributes
 	 */
 	protected function _getTableInstance($ps_table,$pn_id=null){		// $pn_id might be a string if the user is fetching by idno
 		if(!in_array($ps_table, $this->opa_valid_tables)){
@@ -136,7 +160,11 @@ class BaseJSONService {
 
 		if ($pn_id && !is_numeric($pn_id) && ($vs_idno_fld = $t_instance->getProperty('ID_NUMBERING_ID_FIELD')) && preg_match("!^[A-Za-z0-9_\-\.,\[\]]+$!", $pn_id)) {
 			// User is loading by idno
-			if(!$t_instance->load(array($vs_idno_fld => $pn_id))){
+			$va_load_spec = array($vs_idno_fld => $pn_id);
+			if(!$vb_include_deleted && $t_instance->hasField('deleted')){
+				$va_load_spec['deleted'] = 0;
+			}
+			if(!$t_instance->load($va_load_spec)){
 					$this->opa_errors[] = _t("idno does not exist");
 					return false;
 				} else if(!$vb_include_deleted && $t_instance->get("deleted")){
@@ -170,5 +198,3 @@ class BaseJSONService {
 	}
 	# -------------------------------------------------------
 }
-
-?>

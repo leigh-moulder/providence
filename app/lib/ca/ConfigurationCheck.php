@@ -7,7 +7,7 @@
  * ----------------------------------------------------------------------
  *
  * Software by Whirl-i-Gig (http://www.whirl-i-gig.com)
- * Copyright 2010-2013 Whirl-i-Gig
+ * Copyright 2010-2015 Whirl-i-Gig
  *
  * For more information visit http://www.CollectiveAccess.org
  *
@@ -177,7 +177,7 @@ final class ConfigurationCheck {
 		}
 
 		// check web root for write-ability
-		if (!$vb_perm_media_error && !$vb_at_least_one_part_of_the_media_path_exists && !is_writeable($vs_web_root)) {
+		if (!$vb_perm_media_error && !$vb_at_least_one_part_of_the_media_path_exists && !is_writeable($vs_base_dir)) {
 			$vb_perm_media_error = true;
 			$vs_perm_media_path = $vs_base_dir;
 		}
@@ -242,12 +242,12 @@ final class ConfigurationCheck {
 	 */
 	public static function DBOutOfDateQuickCheck() {
 		if (!in_array('ca_schema_updates', self::$opo_db->getTables())) {
-			self::addError(_t("Your database is extremely out-of-date. Please install all database migrations starting with migration #1 or contact support@collectiveaccess.org for assistance. See the <a href=\"http://wiki.collectiveaccess.org/index.php?title=Applying_Database_Updates\">update HOW-TO</a> for instructions on applying database updates manually."));
+			self::addError(_t("Your database is extremely out-of-date. Please install all database migrations starting with migration #1 or contact support@collectiveaccess.org for assistance. See the <a href=\"http://docs.collectiveaccess.org/wiki/Applying_Database_Updates\">update HOW-TO</a> for instructions on applying database updates manually."));
 		} else if (($vn_schema_revision = self::getSchemaVersion()) < __CollectiveAccess_Schema_Rev__) {
 			if (defined('__CA_ALLOW_AUTOMATIC_UPDATE_OF_DATABASE__') && __CA_ALLOW_AUTOMATIC_UPDATE_OF_DATABASE__) {
-				self::addError(_t("Your database is out-of-date. Please install all schema migrations starting with migration #%1. <a href='index.php?updateSchema=1'><strong>Click here</strong></a> to automatically apply the required updates, or see the <a href=\"http://wiki.collectiveaccess.org/index.php?title=Applying_Database_Updates\">update HOW-TO</a> for instructions on applying database updates manually.<br/><br/><div align='center'><strong>NOTE: you should back-up your database before applying updates!</strong></div>",($vn_schema_revision + 1)));
+				self::addError(_t("Your database is out-of-date. Please install all schema migrations starting with migration #%1. <a href='index.php?updateSchema=1'><strong>Click here</strong></a> to automatically apply the required updates, or see the <a href=\"http://docs.collectiveaccess.org/wiki/Applying_Database_Updates\">update HOW-TO</a> for instructions on applying database updates manually.<br/><br/><div align='center'><strong>NOTE: you should back-up your database before applying updates!</strong></div>",($vn_schema_revision + 1)));
 			} else {
-				self::addError(_t("Your database is out-of-date. Please install all schema migrations starting with migration #%1. See the <a href=\"http://wiki.collectiveaccess.org/index.php?title=Applying_Database_Updates\">update HOW-TO</a> for instructions on applying database updates manually.<br/><br/><div align='center'><strong>NOTE: you should back-up your database before applying updates!</strong></div>",($vn_schema_revision + 1)));
+				self::addError(_t("Your database is out-of-date. Please install all schema migrations starting with migration #%1. See the <a href=\"http://docs.collectiveaccess.org/wiki/Applying_Database_Updates\">update HOW-TO</a> for instructions on applying database updates manually.<br/><br/><div align='center'><strong>NOTE: you should back-up your database before applying updates!</strong></div>",($vn_schema_revision + 1)));
 			}
 			for($vn_i = ($vn_schema_revision + 1); $vn_i <= __CollectiveAccess_Schema_Rev__; $vn_i++) {
 				if ($o_instance = ConfigurationCheck::getVersionUpdateInstance($vn_i)) {
@@ -265,8 +265,8 @@ final class ConfigurationCheck {
 	 */
 	public static function PHPVersionQuickCheck() {
 		$va_php_version = caGetPHPVersion();
-		if($va_php_version["versionInt"]<50106){
-			self::addError(_t("CollectiveAccess requires PHP version 5.1.6 or higher to function properly. You're running %1. Please upgrade.",$va_php_version["version"]));
+		if($va_php_version["versionInt"]<50400){
+			self::addError(_t("CollectiveAccess requires PHP version 5.4 or higher to function properly. You're running %1. Please upgrade.",$va_php_version["version"]));
 		}
 		return true;
 	}
@@ -278,6 +278,25 @@ final class ConfigurationCheck {
 		if(!file_exists(__CA_APP_DIR__."/tmp") || !is_writable(__CA_APP_DIR__."/tmp")){
 			self::addError(_t("It looks like the directory for temporary files is not writable by the webserver. Please change the permissions of %1 and enable the user which runs the webserver to write this directory.",__CA_APP_DIR__."/tmp"));
 		}
+
+		if(!defined('__CA_CACHE_BACKEND__')) {
+			define('__CA_CACHE_BACKEND__', 'file');
+		}
+
+		if(!defined('__CA_CACHE_FILEPATH__')) {
+			define('__CA_CACHE_FILEPATH__', __CA_APP_DIR__.DIRECTORY_SEPARATOR.'tmp');
+		}
+
+
+		if(__CA_CACHE_BACKEND__ == 'file') {
+			if(
+				file_exists(__CA_CACHE_FILEPATH__.DIRECTORY_SEPARATOR.__CA_APP_NAME__.'Cache') && // if it doesn't exist, it can be probably be created or the above check would fail
+				!is_writable(__CA_CACHE_FILEPATH__.DIRECTORY_SEPARATOR.__CA_APP_NAME__.'Cache')
+			) {
+				self::addError(_t("It looks like the cache directory is not writable by the webserver. Please change the permissions of %1 and enable the user which runs the webserver to write this directory.",__CA_CACHE_FILEPATH__.DIRECTORY_SEPARATOR.__CA_APP_NAME__.'Cache'));
+			}
+		}
+
 		return true;
 	}
 	# -------------------------------------------------------
@@ -293,8 +312,10 @@ final class ConfigurationCheck {
 	 * Does the HTMLPurifier DefinitionCache dir exist and is it writable?
 	 */
 	public static function htmlPurifierDirQuickCheck() {
-		if(!file_exists(__CA_LIB_DIR__."/core/Parsers/htmlpurifier/standalone/HTMLPurifier/DefinitionCache") || !is_writable(__CA_LIB_DIR__."/core/Parsers/htmlpurifier/standalone/HTMLPurifier/DefinitionCache")){
-			self::addError(_t("It looks like the directory for HTML filtering caches is not writable by the webserver. Please change the permissions of %1 and enable the user which runs the webserver to write this directory.",__CA_LIB_DIR__."/core/Parsers/htmlpurifier/standalone/HTMLPurifier/DefinitionCache"));
+		$vs_purifier_path = __CA_BASE_DIR__.'/vendor/ezyang/htmlpurifier/library/HTMLPurifier/DefinitionCache/Serializer';
+
+		if(!file_exists($vs_purifier_path) || !is_writable($vs_purifier_path)){
+			self::addError(_t("It looks like the directory for HTML filtering caches is not writable by the webserver. Please change the permissions of %1 and enable the user which runs the webserver to write this directory.", $vs_purifier_path));
 		}
 		return true;
 	}
@@ -345,8 +366,8 @@ final class ConfigurationCheck {
 		if (!function_exists("iconv")) {
 			self::addError(_t("PHP iconv module is required for CollectiveAccess to run. Please install it."));
 		}
-		if (!function_exists("mysql_query")) {
-			self::addError(_t("PHP mysql module is required for CollectiveAccess to run. Please install it."));
+		if (!function_exists("mysql_query") && !function_exists("mysqli_query")) {
+			self::addError(_t("PHP mysql or mysqli module is required for CollectiveAccess to run. Please install it."));
 		}
 		if (!function_exists("gzcompress")){
 			self::addError(_t("PHP zlib module is required for CollectiveAccess to run. Please install it."));
@@ -356,6 +377,21 @@ final class ConfigurationCheck {
 		}
 		if (!class_exists("DOMDocument")){
 			self::addError(_t("PHP Document Object Model (DOM) module is required for CollectiveAccess to run. Please install it."));
+		}
+		if (!function_exists('mcrypt_create_iv') && !function_exists('openssl_random_pseudo_bytes')){
+			self::addError(_t("Either the mcrypt or openssl module are required for CollectiveAccess to run. Please install one of them (or both)."));
+		}
+		if (!function_exists('hash_hmac')){
+			self::addError(_t("The PHP Message Digest (hash) engine is required for CollectiveAccess to run. Please install it."));
+		}
+		if (!in_array('sha256', hash_algos())){
+			self::addError(_t("Your PHP installation doesn't seem to have support for the sha256 hashing algorithm. Please install a newer version of either PHP or the hash module."));
+		}
+		if (!class_exists('PharData')) {
+			self::addError(_t("The PHP phar module is required for CollectiveAccess to run. Please install it."));
+		}
+		if (!function_exists("curl_exec")){
+			self::addError(_t("The PHP cURL module is required for CollectiveAccess to run. Please install it."));
 		}
 		
 		if (@preg_match('/\p{L}/u', 'a') != 1) {

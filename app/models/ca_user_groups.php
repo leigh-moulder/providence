@@ -190,7 +190,7 @@ class ca_user_groups extends BaseModel {
 	# Change logging
 	# ------------------------------------------------------
 	protected $UNIT_ID_FIELD = null;
-	protected $LOG_CHANGES_TO_SELF = false;
+	protected $LOG_CHANGES_TO_SELF = true;
 	protected $LOG_CHANGES_USING_AS_SUBJECT = array(
 		"FOREIGN_KEYS" => array(
 		
@@ -252,7 +252,6 @@ class ca_user_groups extends BaseModel {
 			WHERE
 				parent_id IS NOT NULL
 				{$vs_user_id_sql}
-			{$vs_sort}
 		";
 		$qr_groups = $o_db->query($vs_sql);
 		
@@ -348,13 +347,14 @@ class ca_user_groups extends BaseModel {
 		if (!is_array($pm_roles)) {
 			$pm_roles = array($pm_roles);
 		}
+
+		require_once(__CA_APP_DIR__.'/models/ca_groups_x_roles.php');
 		
 		if ($pn_group_id = $this->getPrimaryKey()) {
 			$t_role = new ca_user_roles();
 			
 			$vn_roles_added = 0;
-			
-			$o_db = $this->getDb();
+
 			foreach ($pm_roles as $vs_role) {
 				$vs_role = trim(preg_replace('![\n\r\t]+!', '', $vs_role));
 				$vb_got_role = 0;
@@ -366,22 +366,19 @@ class ca_user_groups extends BaseModel {
 						if (!$t_role->load(array("name" => $vs_role))) {
 							continue;
 						}
-						
 					}
-					$vb_got_role = 1;
 				}
-					
-				$o_db->query("
-					INSERT INTO ca_groups_x_roles 
-					(group_id, role_id)
-					VALUES
-					(?, ?)
-				", (int)$pn_group_id, (int)$t_role->getPrimaryKey());
+
+				$t_gxr = new ca_groups_x_roles();
+				$t_gxr->set('group_id', $pn_group_id);
+				$t_gxr->set('role_id', $t_role->getPrimaryKey());
+				$t_gxr->setMode(ACCESS_WRITE);
+				$t_gxr->insert();
 				
-				if ($o_db->numErrors() == 0) {
+				if ($t_gxr->numErrors() == 0) {
 					$vn_roles_added++;
 				} else {
-					$this->postError(930, _t("Database error adding role '%1': %2", $vs_role, join(';', $o_db->getErrors())),"ca_user_groups->addRoles()");
+					$this->postError(930, _t("Database error adding role '%1': %2", $vs_role, join(';', $t_gxr->getErrors())),"ca_user_groups->addRoles()");
 				}
 			}
 			return $vn_roles_added;
@@ -589,7 +586,7 @@ class ca_user_groups extends BaseModel {
 				WHERE
 					(group_id = ?) AND
 					(role_id = ?)
-			", (int)$pn_group_id, (int)$t_role->getPrimaryKey());
+			", (int)$vn_group_id, (int)$t_role->getPrimaryKey());
 			
 			if (!$qr_res) { return false; }
 			

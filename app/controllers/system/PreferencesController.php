@@ -104,6 +104,8 @@
 						foreach($_REQUEST AS $vs_k => $vs_v) {
 							if (preg_match("!pref_{$vs_pref}_([\d]+)!", $vs_k, $va_matches)) {
 								$va_ui_prefs[$vs_pref][$va_matches[1]] = $vs_v;
+							} elseif (preg_match("!pref_{$vs_pref}__NONE_!", $vs_k)) {
+								$va_ui_prefs[$vs_pref]['_NONE_'] = $vs_v;
 							}
 						}
 					
@@ -173,11 +175,14 @@
 						'ca_loans', 'ca_movements', 'ca_lists', 'ca_list_items', 'ca_tours', 'ca_tour_stops', 'ca_sets', 'ca_bundle_displays'
 					) as $vs_table) {
 						foreach($this->request->user->getValidPreferences($vs_group) as $vs_pref) {
+							if(!$this->getRequest()->getUser()->isValidPreference("{$vs_table}_{$vs_pref}")) { continue; }
+
 							if ($vs_pref == 'duplicate_relationships') {
 								$vs_val = $this->request->getParameter("pref_{$vs_table}_{$vs_pref}", pArray);
 							} else {
 								$vs_val = $this->request->getParameter("pref_{$vs_table}_{$vs_pref}", pString);
 							}
+
 							$this->request->user->setPreference("{$vs_table}_{$vs_pref}", $vs_val);
 						}
 					}
@@ -202,8 +207,7 @@
 							$g_ui_locale = $this->request->user->getPreferredUILocale();				// get current UI locale as locale string 			(available as global)
 							
 							if(!initializeLocale($g_ui_locale)) die("Error loading locale ".$g_ui_locale);
-							global $ca_translation_cache;
-							$ca_translation_cache = array();				
+							MemoryCache::flush('translation');
 							
 							// reload menu bar
 							AppNavigation::clearMenuBarCache($this->request);

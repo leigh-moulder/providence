@@ -35,7 +35,7 @@
   */
  
 require_once(__CA_LIB_DIR__."/core/Configuration.php");
-require_once(__CA_LIB_DIR__."/core/Error.php");
+require_once(__CA_LIB_DIR__."/core/ApplicationError.php");
 require_once(__CA_LIB_DIR__."/core/Print/PrintForms/PrintFormElements.php");
 require_once(__CA_LIB_DIR__."/core/Print/phpqrcode/qrlib.php");
 
@@ -138,7 +138,7 @@ class PrintFormQRCodeElement extends PrintFormElements {
 						$vs_opts .= ' rotate='.intval($va_style['rotate']);
 					}
 				}
-				$po_pdf->fit_image($vn_image_ref, $vn_x, $vn_y - $vn_h, $vs_opts);
+				$po_pdf->fit_image($vn_image_ref, $vn_x, $vn_y, $vs_opts);
 			}
 		}
 		@unlink($vs_tmp);

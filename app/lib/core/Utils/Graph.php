@@ -34,7 +34,7 @@
   *
   */
  
-require_once(__CA_LIB_DIR__."/core/Error.php");
+require_once(__CA_LIB_DIR__."/core/ApplicationError.php");
 require_once(__CA_LIB_DIR__."/core/Configuration.php");
 	
 # ----------------------------------------------------------------------
@@ -257,6 +257,7 @@ class Graph {
 		$va_edges =& $this->opa_graph["EDGES"];
 		
 		$vs_closest_node = $ps_start_node; 
+		$va_paths = array();
 		while (isset($vs_closest_node)) { 
 			$va_marked[$vs_closest_node] = true; 
 			

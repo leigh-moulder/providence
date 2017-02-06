@@ -44,7 +44,7 @@
 			$this->opo_config = Configuration::load($ps_widget_path.'/conf/trackProcessing.conf');
 			$this->opo_db = new Db();
 			
-			JavascriptLoadManager::register('prettyDate');
+			AssetLoadManager::register('prettyDate');
 		}
 		# -------------------------------------------------------
 		/**
@@ -89,7 +89,7 @@
 				$va_completed[$va_row["task_id"]]["error_code"] = $va_row["error_code"];
 				
 				if ((int)$va_row["error_code"] > 0) {
-					$o_e = new Error((int)$va_row["error_code"], '', '', '', false, false);
+					$o_e = new ApplicationError((int)$va_row["error_code"], '', '', '', false, false);
 					$va_row["error_message"] = $o_e->getErrorMessage();
 				} else {
 					$va_row["error_message"] = '';

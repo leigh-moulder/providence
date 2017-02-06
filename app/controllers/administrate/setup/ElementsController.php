@@ -44,7 +44,7 @@ class ElementsController extends BaseEditorController {
 	}
 	# -------------------------------------------------------
 	public function Index() {
-		JavascriptLoadManager::register('tableList');
+		AssetLoadManager::register('tableList');
 	
 		$vo_dm = Datamodel::load();
 		$va_elements = ca_metadata_elements::getRootElementsAsList(null, null, true, true);
@@ -60,7 +60,7 @@ class ElementsController extends BaseEditorController {
 	}
 	# -------------------------------------------------------
 	public function Edit($pa_values=null, $pa_options=null){
-		JavascriptLoadManager::register('bundleableEditor');
+		AssetLoadManager::register('bundleableEditor');
 		
 		
 		$t_element = $this->getElementObject();
@@ -119,7 +119,7 @@ class ElementsController extends BaseEditorController {
 	}
 	# -------------------------------------------------------
 	public function Save($pa_values=null) {
-		$t_element = $this->getElementObject();
+		$t_element = $this->getElementObject(false);
 		$t_element->setMode(ACCESS_WRITE);
 		$va_request = $_REQUEST; /* we don't want to modify $_REQUEST since this may cause ugly side-effects */
 		foreach($t_element->getFormFields() as $vs_f => $va_field_info) {
@@ -252,20 +252,28 @@ class ElementsController extends BaseEditorController {
 					$t_element->update(); 
 					$va_settings = $t_element->getAvailableSettings();
 				}
-				
+
+				// we need to unset the form timestamp to disable the 'Changes have been made since you loaded this data' warning
+				// when we update() below. the warning makes sense because an update() is called before we get here, but if there
+				// was an actual concurrent save problem , that very update above would have triggered the warning already
+				$vn_timestamp = $_REQUEST['form_timestamp'];
+				unset($_REQUEST['form_timestamp']);
+
 				foreach($va_settings as $vs_setting_key => $va_setting_info) {
 					if (isset($va_request['setting_'.$vs_setting_key.'[]'])) {
 						$vs_val = $va_request['setting_'.$vs_setting_key.'[]'];
 					} else {
 						$vs_val = $va_request['setting_'.$vs_setting_key];
 					}
-					
+					$vs_error = null;
 					if (!($t_element->setSetting($vs_setting_key, $vs_val, $vs_error))) {
 						$this->notification->addNotification(_t("Setting %2 is not valid: %1", $vs_error, $vs_setting_key), __NOTIFICATION_TYPE_ERROR__);
 						continue;
 					}
 					$t_element->update();
 				}
+
+				$_REQUEST['form_timestamp'] = $vn_timestamp;
 			}
 			
 			/* process type restrictions */
@@ -314,6 +322,9 @@ class ElementsController extends BaseEditorController {
 					continue;
 				}
 			}
+
+			CompositeCache::delete($t_element->getPrimaryKey(), 'ElementSets');
+			CompositeCache::delete($t_element->getPrimaryKey(), 'ElementSetIds');
 		}
 		
 		$this->Edit();
@@ -428,7 +439,8 @@ class ElementsController extends BaseEditorController {
 		if (!($vn_element_id = $this->request->getParameter('element_id', pInteger))) {
 			$vn_element_id = $pn_element_id;
 		}
-		$t_element = new ca_metadata_elements($vn_element_id);
+		$t_element = new ca_metadata_elements();
+		$t_element->load($vn_element_id, false);
  		if ($pb_set_view_vars){
  			$this->view->setVar('element_id', $vn_element_id);
  			$this->view->setVar('t_element', $t_element);
@@ -528,7 +540,7 @@ class ElementsController extends BaseEditorController {
 			}
 		}
 		
-		$this->view->setVar('available_settings',$t_element->getAvailableSettings($ps_service));
+		$this->view->setVar('available_settings',$t_element->getAvailableSettings());
 		$this->render("ajax_elements_settings_form_html.php");
 	}
 	# -------------------------------------------------------

@@ -7,7 +7,7 @@
  * ----------------------------------------------------------------------
  *
  * Software by Whirl-i-Gig (http://www.whirl-i-gig.com)
- * Copyright 2008-2013 Whirl-i-Gig
+ * Copyright 2008-2015 Whirl-i-Gig
  *
  * For more information visit http://www.CollectiveAccess.org
  *
@@ -39,15 +39,21 @@
  
 	class BaseLabel extends BaseModel {
 		# -------------------------------------------------------
-		
+		public function __construct($pn_id=null, $pb_use_cache=true) {
+			parent::__construct($pn_id, $pb_use_cache);
+		}
 		# -------------------------------------------------------
 		public function insert($pa_options=null) {
 			$this->_generateSortableValue();	// populate sort field
+			// invalidate get() prefetch cache
+			SearchResult::clearResultCacheForTable($this->tableName());
 			return parent::insert($pa_options);
 		}
 		# -------------------------------------------------------
 		public function update($pa_options=null) {
 			$this->_generateSortableValue();	// populate sort field
+			// invalidate get() prefetch cache
+			SearchResult::clearResultCacheForTable($this->tableName());
 			
 			// Invalid entire labels-by-id cache since we can't know what entries pertain to the label we just changed
 			LabelableBaseModelWithAttributes::$s_labels_by_id_cache = array();		
@@ -98,6 +104,11 @@
 			if ($vs_subject_table_name = $this->getSubjectTableName()) {
 				$t_subject =  $this->_DATAMODEL->getInstanceByTableName($vs_subject_table_name, true);
 				
+				if ($t_subject->inTransaction()) { 
+					$t_subject->setTransaction($this->getTransaction()); 
+				} else {
+					$t_subject->setDb($this->getDb());
+				}
 				if (!caGetOption("dontLoadInstance", $pa_options, false) && ($vn_id = $this->get($t_subject->primaryKey()))) {
 					$t_subject->load($vn_id);
 				}
@@ -127,29 +138,22 @@
 			if ($vs_sort_field = $this->getProperty('LABEL_SORT_FIELD')) {
 				$vs_display_field = $this->getProperty('LABEL_DISPLAY_FIELD');
 				
-				$o_tep = new TimeExpressionParser();
-				
-				$o_tep->setLanguage(ca_locales::localeIDToCode($this->get('locale_id')));
-				$o_lang_settings = $o_tep->getLanguageSettings();
-				$vs_display_value = trim(preg_replace('![^\p{L}0-9 ]+!u', ' ', $this->get($vs_display_field)));
-				
-				$va_definite_articles = $o_lang_settings->get('definiteArticles');
-				$va_indefinite_articles = $o_lang_settings->get('indefiniteArticles');
-				
-				foreach(array($o_lang_settings->get('definiteArticles'), $o_lang_settings->get('indefiniteArticles')) as $va_articles) {
-					if (is_array($va_articles)) {
-						foreach($va_articles as $vs_article) {
-							if (preg_match('!^('.$vs_article.')[ ]+!i', $vs_display_value, $va_matches)) {
-								$vs_display_value = trim(str_replace($va_matches[1], '', $vs_display_value).', '.$va_matches[1]);
-								break(2);
-							}
-						}
-					}
-				}
-				
+				$t_locale = new ca_locales();
+				$vs_display_value = caSortableValue($this->get($vs_display_field), array('locale' => $t_locale->localeIDToCode($this->get('locale_id'))));
+			
 				$this->set($vs_sort_field, $vs_display_value);
 			}
 		}
 		# -------------------------------------------------------
+		/**
+		 * Set label type list; can vary depending upon whether label is preferred or nonpreferred
+		 */
+		public function setLabelTypeList($ps_list_idno) {
+			if ($this->hasField('type_id')) { 
+				$this->FIELDS['type_id']['LIST_CODE'] = $ps_list_idno; 
+				return true;
+			}
+			return false;
+		}
+		# -------------------------------------------------------
 	}
-?>

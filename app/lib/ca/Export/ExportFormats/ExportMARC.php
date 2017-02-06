@@ -75,9 +75,6 @@ class ExportMARC extends BaseExportFormat {
 	public function processExport($pa_data,$pa_options=array()){
 		$pb_single_record = (isset($pa_options['singleRecord']) && $pa_options['singleRecord']);
 
-		//caDebug($pa_data,"Data to build MARC from");
-		//caDebug($pa_options,"Export format options");
-
 		$o_record = new File_MARC_Record();
 
 		foreach($pa_data as $va_item){
@@ -92,14 +89,14 @@ class ExportMARC extends BaseExportFormat {
 				// process sub-fields
 				if(is_array($va_item['children'])){
 					foreach($va_item['children'] as $va_child){
-						$va_subfields[] = new File_MARC_Subfield($va_child['element'], $va_child['text']);
+						$va_subfields[] = new File_MARC_Subfield($va_child['element'], caDecodeAllEntities(strip_tags($va_child['text'])));
 					}	
 				}
 
 				$o_field = new File_MARC_Data_field($vs_tag,$va_subfields,$vs_ind1,$vs_ind2);
 
 			} else { // simple control field
-				$o_field = new File_MARC_Control_Field($vs_element,$va_item['text']);
+				$o_field = new File_MARC_Control_Field($vs_element, caDecodeAllEntities(strip_tags($va_item['text'])));
 			}
 
 			$o_record->appendField($o_field);
